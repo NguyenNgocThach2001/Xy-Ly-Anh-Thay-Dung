@@ -1,0 +1,20 @@
+names:
+- Sĩ đen
+- Pháo đen
+- Xe đen
+- Tượng đen
+- Tướng đen
+- Mã đen
+- Tốt đen
+- Giao điểm
+- Sĩ đỏ
+- Pháo đỏ
+- Xe đỏ
+- Tượng đỏ
+- Tướng đỏ
+- Mã đỏ
+- Tốt đỏ
+nc: 15
+path: ./dataset
+train: images/train_fold1
+val: images/val_fold1
