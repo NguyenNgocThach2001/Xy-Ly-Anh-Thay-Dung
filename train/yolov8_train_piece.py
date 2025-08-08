@@ -2,7 +2,7 @@ from ultralytics import YOLO
 
 def train_yolov8():
     # === CẤU HÌNH ===
-    base_model = "yolov8n.pt"
+    base_model = "yolov8s.pt"
     data_yaml = "dataset/piece/Dataset_combined/data.yaml"
     epochs = 500
     imgsz = 640
@@ -17,7 +17,7 @@ def train_yolov8():
         epochs=epochs,
         imgsz=imgsz,
         batch=batch,
-        name="model_on_dataset_combined_500_epoch",
+        name="model_on_dataset_combined_500_epoch_2",
         mosaic=1.0, 
         save_period=50
     )

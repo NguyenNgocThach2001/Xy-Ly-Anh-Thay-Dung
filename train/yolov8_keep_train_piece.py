@@ -2,8 +2,8 @@ from ultralytics import YOLO
 
 def train_yolov8_resume():
     # === CẤU HÌNH ===
-    pretrained_weights = "runs/detect/model_on_dataset3_continue2_continue_continue/weights/last.pt"  # model đã train trước đó
-    data_yaml = "dataset/piece/Dataset4_270image/data.yaml"              # file cấu hình dataset
+    pretrained_weights = "runs/detect/model_on_dataset_combined_500_epoch_2/weights/last.pt"  # model đã train trước đó
+    data_yaml = "dataset/piece/Dataset_combined/data.yaml"              # file cấu hình dataset
     epochs = 100        # train thêm 50 epochs nữa
     imgsz = 640
     batch = 8
@@ -17,8 +17,8 @@ def train_yolov8_resume():
         epochs=epochs,
         imgsz=imgsz,
         batch=batch,
-        name="model_on_dataset3_continue2_continue_continue_continue",
-        resume=False  # Không dùng checkpoint Ultralytics, chỉ load trọng số từ last.pt
+        name="model_on_dataset_combined_500_epoch_2",
+        resume=True  # Không dùng checkpoint Ultralytics, chỉ load trọng số từ last.pt
     )
 
     print("✅ Tiếp tục huấn luyện hoàn tất!")

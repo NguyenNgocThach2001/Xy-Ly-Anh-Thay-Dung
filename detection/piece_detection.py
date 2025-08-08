@@ -1,42 +1,54 @@
-from ultralytics import YOLO
-import cv2
 import numpy as np
+from ultralytics import YOLO
 
-def load_piece_model(model_path="runs/detect/model_on_dataset_combined_500_epoch/weights/best.pt"):
+PAD_RATIO = 0.10  # phải khớp với board_detection
+
+def load_piece_model(model_path="runs/detect/model_on_dataset_combined_500_epoch_23/weights/best.pt"):
     return YOLO(model_path)
 
-def detect_pieces_and_get_positions(model, frame):
+def _clamp(v, lo, hi):
+    return max(lo, min(hi, v))
+
+def detect_pieces_and_get_positions(model, board_img, grid_info, conf=0.8, iou=0.5, imgsz=640):
+    """
+    Trả về danh sách đúng format Pygame draw_pieces:
+      [(label, (col,row)), ...]  với col ∈ [0..8], row ∈ [0..9]
+    """
+    H, W = board_img.shape[:2]
     class_names = model.model.names
-    results = model.predict(source=frame, conf=0.8, verbose=False)
 
-    pieces = []
+    r = model.predict(source=board_img, conf=conf, iou=iou, imgsz=imgsz, verbose=False)[0]
+    if r.boxes is None or len(r.boxes) == 0:
+        return []
 
-    WIDTH, HEIGHT = 640, 640
-    SAFE_MARGIN_X = 20  # chỉnh nếu cần
-    SAFE_MARGIN_Y = 30
+    boxes = r.boxes.xyxy.cpu().numpy()
+    scores = r.boxes.conf.cpu().numpy()
+    clss   = r.boxes.cls.cpu().numpy()
 
-    GRID_X0 = SAFE_MARGIN_X
-    GRID_Y0 = SAFE_MARGIN_Y
-    GRID_W = WIDTH - 2 * SAFE_MARGIN_X
-    GRID_H = HEIGHT - 2 * SAFE_MARGIN_Y
+    # Lưới dựa theo padding/usable (khớp với ảnh warp hiển thị)
+    pad_x = grid_info.get("pad_x", int(W * PAD_RATIO))
+    pad_y = grid_info.get("pad_y", int(H * PAD_RATIO))
+    usable_w = grid_info.get("usable_w", W - 2 * pad_x)
+    usable_h = grid_info.get("usable_h", H - 2 * pad_y)
 
-    CELL_W = GRID_W / 9
-    CELL_H = GRID_H / 10
+    # Chuyển bbox -> tâm -> nút lưới
+    cand = []
+    for b, sc, ci in zip(boxes, scores, clss):
+        x1, y1, x2, y2 = b
+        cx = 0.5 * (x1 + x2)
+        cy = 0.5 * (y1 + y2)
+        colf = (cx - pad_x) / max(1, usable_w) * 8.0
+        rowf = (cy - pad_y) / max(1, usable_h) * 9.0
+        col = _clamp(int(round(colf)), 0, 8)
+        row = _clamp(int(round(rowf)), 0, 9)
+        label = class_names.get(int(ci), str(int(ci)))
+        cand.append((label, (col, row), float(sc)))
 
-    for r in results:
-        for box, cls_id in zip(r.boxes.xyxy, r.boxes.cls):
-            b = box.cpu().numpy()
-            x1, y1, x2, y2 = b
-            center_x = (x1 + x2) / 2
-            center_y = (y1 + y2) / 2
+    # Giải quyết trùng ô: giữ detection có confidence cao nhất
+    best = {}
+    for name, pos, score in cand:
+        if pos not in best or score > best[pos][1]:
+            best[pos] = (name, score)
 
-            # Xích vào trong vùng chia lưới
-            col = int((center_x - GRID_X0) / CELL_W)
-            row = int((center_y - GRID_Y0) / CELL_H)
-
-            if 0 <= col <= 8 and 0 <= row <= 9:
-                label = class_names.get(int(cls_id.item()), str(int(cls_id.item())))
-                pieces.append((label, (col, row)))
-
-    return pieces
-
+    pieces_for_pygame = [(name, pos) for pos, (name, _) in best.items()]
+    return pieces_for_pygame
