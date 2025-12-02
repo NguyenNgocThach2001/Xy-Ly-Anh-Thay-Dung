@@ -31,7 +31,7 @@ def letterbox(img, new_shape=(640, 640), color=(114, 114, 114)):
 # ==== MỞ CAMERA ====
 cap = cv2.VideoCapture(CAMERA_SOURCE)
 if not cap.isOpened():
-    print("❌ Không mở được camera.")
+    print("Không mở được camera.")
     exit()
 
 while True:

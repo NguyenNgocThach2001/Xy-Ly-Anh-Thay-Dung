@@ -1,14 +1,14 @@
 from ultralytics import YOLO
 
 def train_yolov8():
-    # === CẤU HÌNH ===
-    base_model = "yolov8s.pt"
+    # CẤU HÌNH
+    base_model = "yolov8n.pt"
     data_yaml = "dataset/piece/Dataset_combined/data.yaml"
     epochs = 500
     imgsz = 640
     batch = 16
 
-    # Khởi tạo model từ pretrained
+    # Khởi tạo model
     model = YOLO(base_model)
 
     # Train model kèm mosaic augmentation
@@ -17,12 +17,10 @@ def train_yolov8():
         epochs=epochs,
         imgsz=imgsz,
         batch=batch,
-        name="model_on_dataset_combined_500_epoch_2",
+        name="model_on_dataset_combined_500_epoch_nano",
         mosaic=1.0, 
         save_period=50
     )
-
-    print("✅ Huấn luyện hoàn tất!")
 
 if __name__ == "__main__":
     train_yolov8()

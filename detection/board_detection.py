@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 
-PAD_RATIO = 0.10   # phải thống nhất với piece_detection
+PAD_RATIO = 0.2   # phải thống nhất với piece_detection
 
 # =============================
 # Helpers chung
@@ -14,20 +14,27 @@ def extract_quad_from_mask(mask):
     for cnt in contours:
         epsilon = 0.03 * cv2.arcLength(cnt, True)
         approx = cv2.approxPolyDP(cnt, epsilon, True)
-        if len(approx) == 4 and cv2.isContourConvex(approx):
-            return approx.reshape(4, 2)
+        if len(approx) == 4:
+            quad = approx.reshape(-1, 2).astype(np.float32)
+            return quad
     return None
 
 def order_quad_points(pts):
-    center = np.mean(pts, axis=0)
-    def angle(pt): return np.arctan2(pt[1] - center[1], pt[0] - center[0])
-    pts_sorted = sorted(pts, key=angle)
-    pts_sorted = np.array(pts_sorted, dtype=np.float32)
-    top_left_idx = np.argmin(np.sum(pts_sorted, axis=1))
-    pts_sorted = np.roll(pts_sorted, -top_left_idx, axis=0)
-    return pts_sorted
+    pts = np.array(pts, dtype=np.float32)
+    s = pts.sum(axis=1)
+    diff = np.diff(pts, axis=1)
+    ordered = np.zeros((4, 2), dtype=np.float32)
+    ordered[0] = pts[np.argmin(s)]  # TL
+    ordered[2] = pts[np.argmax(s)]  # BR
+    ordered[1] = pts[np.argmin(diff)]  # TR
+    ordered[3] = pts[np.argmax(diff)]  # BL
+    return ordered
 
 def align_board(frame, quad, output_size=(640, 640)):
+    """
+    Warp theo 4 điểm 'quad' VÀ KHÔNG tự xoay thêm.
+    Góc xoay trả về luôn 0; việc xoay do UI (Rotate 90°) xử lý trước đó.
+    """
     quad = order_quad_points(quad)
     dst = np.array([
         [0, 0],
@@ -37,8 +44,8 @@ def align_board(frame, quad, output_size=(640, 640)):
     ], dtype=np.float32)
     M = cv2.getPerspectiveTransform(quad, dst)
     aligned = cv2.warpPerspective(frame, M, output_size)
-    aligned = cv2.rotate(aligned, cv2.ROTATE_90_CLOCKWISE)  # Giữ orientation cũ
-    return aligned
+    rot = 0  # KHÔNG auto-rotate, để UI quyết định
+    return aligned, rot
 
 def zoomout_after_align(image, pad_ratio=PAD_RATIO):
     h, w = image.shape[:2]
@@ -53,6 +60,34 @@ def zoomout_after_align(image, pad_ratio=PAD_RATIO):
 
 def load_board_model(model_path="runs/segment/yolov8_segment_board/weights/best.pt"):
     return YOLO(model_path)
+
+# =============================
+# Helper mới: warp frame bằng quad đã khóa
+# =============================
+def warp_with_quad(frame, quad, output_size=(640, 640)):
+    """Warp 1 frame mới bằng 4 điểm quad đã có (theo toạ độ *gốc của frame hiện tại*).
+    Trả về (board_img, grid_info)."""
+    if not isinstance(frame, np.ndarray):
+        raise TypeError("frame phải là numpy.ndarray (H, W, 3) BGR")
+    quad = np.array(quad, dtype=np.float32)
+    aligned, rot = align_board(frame, quad, output_size=output_size)
+    aligned_zoomout, (pad_x, pad_y) = zoomout_after_align(aligned, pad_ratio=PAD_RATIO)
+    grid_info = {
+        "pad_x": pad_x,
+        "pad_y": pad_y,
+        "usable_w": output_size[0] - 2 * pad_x,
+        "usable_h": output_size[1] - 2 * pad_y,
+        "rot": int(rot),
+        "quad": quad.astype(float).tolist(),
+        # ==== tham số manual-grid mặc định ====
+        "swap_axes": False,   # False: X=9 cột, Y=10 hàng; True: hoán trục
+        "river_extra": 0.0,   # px thêm cho khe sông
+        "scale_x": 1.0,       # nhân khoảng cách cột
+        "scale_y": 1.0,       # nhân khoảng cách hàng
+        "offset_x": 0.0,      # dịch lưới theo X
+        "offset_y": 0.0,      # dịch lưới theo Y
+    }
+    return aligned_zoomout, grid_info
 
 # =============================
 # YOLO detect
@@ -71,23 +106,40 @@ def detect_board(model, frame):
                     break
 
     if found_quad is not None:
-        aligned = align_board(frame_resized, found_quad, output_size=(640, 640))
+        # Map quad (detected on resized 640x640) back to ORIGINAL frame coordinates
+        H, W = frame.shape[:2]
+        sx = W / 640.0
+        sy = H / 640.0
+        quad_orig = found_quad.astype(np.float32).copy()
+        quad_orig[:, 0] *= sx
+        quad_orig[:, 1] *= sy
+
+        # Warp directly from ORIGINAL frame using quad in original coords
+        aligned, rot = align_board(frame, quad_orig, output_size=(640, 640))
         aligned_zoomout, (pad_x, pad_y) = zoomout_after_align(aligned, pad_ratio=PAD_RATIO)
         grid_info = {
             "pad_x": pad_x,
             "pad_y": pad_y,
             "usable_w": 640 - 2 * pad_x,
-            "usable_h": 640 - 2 * pad_y
+            "usable_h": 640 - 2 * pad_y,
+            "rot": int(rot),  # luôn 0 vì không auto-rotate
+            "quad": quad_orig.astype(float).tolist(),
+            # manual-grid mặc định
+            "swap_axes": False,
+            "river_extra": 0.0,
+            "scale_x": 1.0,
+            "scale_y": 1.0,
+            "offset_x": 0.0,
+            "offset_y": 0.0,
         }
         return aligned_zoomout, True, grid_info
 
-    return frame_resized, False, {"pad_x": 0, "pad_y": 0, "usable_w": 0, "usable_h": 0}
+    return frame_resized, False, {"pad_x": 0, "pad_y": 0, "usable_w": 0, "usable_h": 0, "rot": 0}
 
 # =============================
-# GEOM mode (pipeline theo code bạn tham khảo)
+# GEOM mode (pipeline nhẹ)
 # =============================
 
-# Trạng thái ổn định ngắn hạn (tuỳ chọn)
 _last_warped = None
 _last_quad = None
 _last_mask = None
@@ -95,7 +147,6 @@ _stable_counter = 0
 _STABLE_FRAMES = 10
 
 def _order_points_rect(pts):
-    # giống logic order trong pipeline bạn gửi
     s = pts.sum(axis=1)
     diff = np.diff(pts, axis=1)
     rect = np.zeros((4, 2), dtype="float32")
@@ -121,87 +172,60 @@ def _detect_geom_quad_and_warp(frame):
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     filtered = cv2.bilateralFilter(gray, 9, 75, 75)
-    blurred = cv2.medianBlur(filtered, 7)
-
-    h, w = blurred.shape
-    margin = 0.10
-    y0, y1 = int(h * margin), int(h * (1 - margin))
-    x0, x1 = int(w * margin), int(w * (1 - margin))
-    roi = blurred[y0:y1, x0:x1]
-    roi_offset = (x0, y0)
-
-    edges = cv2.Canny(roi, 50, 150)
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
-    edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+    edges = cv2.Canny(filtered, 50, 150)
+    kernel = np.ones((3, 3), np.uint8)
+    edges = cv2.dilate(edges, kernel, iterations=1)
 
     contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
 
-    best_rect = None
-    for cnt in contours:
-        area = cv2.contourArea(cnt)
-        if area < 4000:
-            continue
-        approx = cv2.approxPolyDP(cnt, 0.02 * cv2.arcLength(cnt, True), True)
+    roi = frame
+    for cnt in contours[:10]:
+        peri = cv2.arcLength(cnt, True)
+        approx = cv2.approxPolyDP(cnt, 0.02 * peri, True)
         if len(approx) == 4:
-            pts = approx.reshape(4, 2) + np.array(roi_offset, dtype=np.float32)
-            if _is_rectangle(pts):
-                best_rect = pts
-                break
+            ordered = order_quad_points(approx.reshape(-1, 2).astype(np.float32))
+            if _is_rectangle(ordered):
+                # Warp từ frame gốc (không resize, không auto-rotate)
+                aligned, rot = align_board(frame, ordered, output_size=(640, 640))
+                aligned_zoomout, (pad_x, pad_y) = zoomout_after_align(aligned, pad_ratio=PAD_RATIO)
 
-    if best_rect is not None:
-        ordered = _order_points_rect(best_rect)
-        center = np.mean(ordered, axis=0)
-        ordered = center + (ordered - center) * 1.05  # nới nhẹ ra ngoài 5%
+                # Giữ ổn định trong vài frame
+                if _last_quad is not None:
+                    dist = np.linalg.norm(_last_quad - ordered)
+                    if dist < 10:
+                        _stable_counter += 1
+                    else:
+                        _stable_counter = 0
+                else:
+                    _stable_counter = 0
 
-        (tl, tr, br, bl) = ordered
-        width = max(np.linalg.norm(br - bl), np.linalg.norm(tr - tl))
-        height = max(np.linalg.norm(tr - br), np.linalg.norm(tl - bl))
-        dst = np.array([[0, 0],
-                        [width - 1, 0],
-                        [width - 1, height - 1],
-                        [0, height - 1]], dtype="float32")
+                _last_warped = aligned_zoomout
+                _last_quad = ordered
+                _last_mask = edges
 
-        M = cv2.getPerspectiveTransform(ordered, dst)
-        warped = cv2.warpPerspective(frame, M, (int(width), int(height)))
+                if _stable_counter >= _STABLE_FRAMES:
+                    grid_info = {
+                        "pad_x": pad_x,
+                        "pad_y": pad_y,
+                        "usable_w": 640 - 2 * pad_x,
+                        "usable_h": 640 - 2 * pad_y,
+                        "rot": int(rot),  # luôn 0
+                        "quad": _last_quad.astype(float).tolist(),
+                        "swap_axes": False,
+                        "river_extra": 0.0,
+                        "scale_x": 1.0,
+                        "scale_y": 1.0,
+                        "offset_x": 0.0,
+                        "offset_y": 0.0,
+                    }
+                    return aligned_zoomout, True, grid_info
 
-        _last_warped = warped
-        _last_quad = ordered
-        _last_mask = edges
-        _stable_counter = _STABLE_FRAMES
-
-        # Chuẩn hóa như YOLO path: căn về 640x640, rotate & pad
-        aligned = cv2.resize(warped, (640, 640))
-        aligned = cv2.rotate(aligned, cv2.ROTATE_90_CLOCKWISE)
-        aligned_zoomout, (pad_x, pad_y) = zoomout_after_align(aligned, pad_ratio=PAD_RATIO)
-        grid_info = {
-            "pad_x": pad_x,
-            "pad_y": pad_y,
-            "usable_w": 640 - 2 * pad_x,
-            "usable_h": 640 - 2 * pad_y
-        }
-        return aligned_zoomout, True, grid_info
-
-    # Không tìm thấy: dùng ổn định ngắn hạn nếu còn
-    if _stable_counter > 0 and _last_warped is not None:
-        _stable_counter -= 1
-        aligned = cv2.resize(_last_warped, (640, 640))
-        aligned = cv2.rotate(aligned, cv2.ROTATE_90_CLOCKWISE)
-        aligned_zoomout, (pad_x, pad_y) = zoomout_after_align(aligned, pad_ratio=PAD_RATIO)
-        grid_info = {
-            "pad_x": pad_x,
-            "pad_y": pad_y,
-            "usable_w": 640 - 2 * pad_x,
-            "usable_h": 640 - 2 * pad_y
-        }
-        return aligned_zoomout, True, grid_info
-
-    # Fallback
     _last_warped = None
     _last_quad = None
     _last_mask = edges if roi.size > 0 else None
     frame_resized = cv2.resize(frame, (640, 640))
-    return frame_resized, False, {"pad_x": 0, "pad_y": 0, "usable_w": 0, "usable_h": 0}
+    return frame_resized, False, {"pad_x": 0, "pad_y": 0, "usable_w": 0, "usable_h": 0, "rot": 0}
 
 # =============================
 # Chọn mode
@@ -224,16 +248,15 @@ def detect_board_with_mode(frame, mode="yolo", model=None, model_light=None, mod
         model_light = model
 
     if mode == "yolo":
-        use_model = model_light if model_light is not None else model_heavy
-        if use_model is None:
-            raise ValueError("Cần truyền model YOLO (model_light hoặc model_heavy) khi dùng mode 'yolo'")
-        return detect_board(use_model, frame)
+        if model_light is None:
+            raise ValueError("Cần model hoặc model_light cho chế độ 'yolo'")
+        return detect_board(model_light, frame)
 
     elif mode == "geom":
         return _detect_geom_quad_and_warp(frame)
 
     elif mode == "auto":
-        # 1) Ưu tiên pipeline nhẹ
+        # 1) Geom trước
         img, found, info = _detect_geom_quad_and_warp(frame)
         if found:
             return img, found, info
@@ -252,7 +275,7 @@ def detect_board_with_mode(frame, mode="yolo", model=None, model_light=None, mod
 
         # 4) Fallback cuối
         frame_resized = cv2.resize(frame, (640, 640))
-        return frame_resized, False, {"pad_x": 0, "pad_y": 0, "usable_w": 0, "usable_h": 0}
+        return frame_resized, False, {"pad_x": 0, "pad_y": 0, "usable_w": 0, "usable_h": 0, "rot": 0}
 
     else:
         raise ValueError("Mode không hợp lệ. Chọn 'yolo', 'geom' hoặc 'auto'.")

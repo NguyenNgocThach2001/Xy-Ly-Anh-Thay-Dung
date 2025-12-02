@@ -1,0 +1,15 @@
+
+__pycache__/
+runs/
+
+dataset_detection/
+dataset_segmentation/
+rawdata/
+processed_data/
+
+*.pyc
+
+yolov8n.pt
+yolov8n.pt
+yolov8s.pt
+yolov8s-seg.pt

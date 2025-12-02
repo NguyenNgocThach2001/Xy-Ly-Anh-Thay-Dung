@@ -1,0 +1,6 @@
+numpy
+opencv-python
+pygame
+ultralytics
+
+#python 3.10

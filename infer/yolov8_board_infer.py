@@ -19,10 +19,10 @@ def run_inference_webcam(model_path="runs/segment/yolov8_segment_board/weights/b
     cap = cv2.VideoCapture("http://192.168.1.97:4747/video")
 
     if not cap.isOpened():
-        print("❌ Không mở được webcam.")
+        print("Không mở được webcam.")
         return
 
-    print("🎥 Đang chạy webcam. Nhấn ESC để thoát...")
+    print("Đang chạy webcam. Nhấn ESC để thoát...")
 
     while True:
         ret, frame = cap.read()

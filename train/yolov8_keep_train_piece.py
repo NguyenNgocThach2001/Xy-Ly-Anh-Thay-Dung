@@ -1,27 +1,23 @@
 from ultralytics import YOLO
 
-def train_yolov8_resume():
-    # === CẤU HÌNH ===
-    pretrained_weights = "runs/detect/model_on_dataset_combined_500_epoch_2/weights/last.pt"  # model đã train trước đó
-    data_yaml = "dataset/piece/Dataset_combined/data.yaml"              # file cấu hình dataset
-    epochs = 100        # train thêm 50 epochs nữa
-    imgsz = 640
-    batch = 8
+def continue_training_after_finish():
+    # 1) load từ best/last của run cũ
+    weights = "runs/detect/model_on_dataset_combined_500_epoch_small/weights/best.pt"
+    model = YOLO(weights)
 
-    # Load model đã huấn luyện
-    model = YOLO(pretrained_weights)
-
-    # Train tiếp tục
-    model.train(
-        data=data_yaml,
-        epochs=epochs,
-        imgsz=imgsz,
-        batch=batch,
-        name="model_on_dataset_combined_500_epoch_2",
-        resume=True  # Không dùng checkpoint Ultralytics, chỉ load trọng số từ last.pt
+    # 2) train TIẾP như run mới (không resume)
+    results = model.train(
+        data="dataset/piece/Dataset_combined/data.yaml",  # hoặc YAML đã gộp
+        epochs=500,       # số epoch bạn muốn thêm
+        imgsz=640,
+        batch=16,
+        lr0=1e-3,         # giảm LR để fine-tune ổn định
+        mosaic=0.3,       # fine-tune nên thấp (0.0–0.3)
+        freeze=0,         # nếu dữ liệu mới rất ít, thử freeze=10
+        name="500_epoch_2_small_continue_mixed_500_more_epoch",   # TÊN MỚI, tránh đè run cũ
+        project="runs/detect",
+        save_period=50,
     )
 
-    print("✅ Tiếp tục huấn luyện hoàn tất!")
-
 if __name__ == "__main__":
-    train_yolov8_resume()
+    continue_training_after_finish()

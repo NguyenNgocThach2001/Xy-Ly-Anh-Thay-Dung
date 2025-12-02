@@ -1,10 +1,9 @@
 from ultralytics import YOLO
 
 def train_yolov8_segment():
-    model = YOLO("yolov8s-seg.pt")  # hoặc yolov8n-seg.pt nếu muốn nhẹ hơn
-
+    model = YOLO("yolov8s-seg.pt") 
     model.train(
-        data="seg_dataset/config.yaml",  # đường dẫn tới file config chứa thông tin dataset
+        data="seg_dataset/config.yaml", 
         epochs=30,
         imgsz=640,
         batch=8,
