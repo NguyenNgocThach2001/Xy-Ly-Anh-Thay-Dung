@@ -1,0 +1,19 @@
+names:
+- black-advisor # si~ 
+- black-cannon 
+- black-chariot
+- black-elephant # tuong
+- black-general
+- black-horse
+- black-soldier
+- red-advisor
+- red-cannon
+- red-chariot # xe
+- red-elephant
+- red-general 
+- red-horse 
+- red-soldier
+nc: 14
+test: test/images
+train: train/images
+val: val/images

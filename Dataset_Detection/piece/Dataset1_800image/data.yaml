@@ -1,0 +1,21 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 15
+names: [
+  'black-cannon', 
+  'black-chariot', 
+  'black-elephant', 
+  'black-general', 
+  'black-guard', 
+  'black-horse', 
+  'black-soldier', 
+  'none', 
+  'red-cannon', 
+  'red-chariot', 
+  'red-elephant', 
+  'red-general', 
+  'red-guard', 
+  'red-horse', 
+  'red-soldier']

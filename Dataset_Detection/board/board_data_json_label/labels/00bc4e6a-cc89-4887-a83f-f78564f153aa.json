@@ -1,0 +1,39 @@
+[
+    {
+        "content": [
+            {
+                "x": 624.5,
+                "y": 152.5
+            },
+            {
+                "x": 1490.5,
+                "y": 100.5
+            },
+            {
+                "x": 1566.5,
+                "y": 965.5
+            },
+            {
+                "x": 398.5,
+                "y": 884.5
+            }
+        ],
+        "rectMask": {
+            "xMin": 398.5,
+            "yMin": 100.5,
+            "width": 1168,
+            "height": 865
+        },
+        "labels": {
+            "labelName": "board",
+            "labelColor": "#ff0000",
+            "labelColorRGB": "255,0,0",
+            "visibility": false
+        },
+        "labelLocation": {
+            "x": 982.5,
+            "y": 533
+        },
+        "contentType": "polygon"
+    }
+]

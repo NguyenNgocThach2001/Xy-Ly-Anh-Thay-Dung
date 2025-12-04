@@ -1,0 +1,6 @@
+names:
+- board
+nc: 1
+path: ./dataset/board
+train: images/
+val: images/
