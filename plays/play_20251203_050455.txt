@@ -1,0 +1,5 @@
+red-cannon x black-horse (1, 7)->(1, 0)
+black-chariot x red-cannon (0, 0)->(1, 0)
+red-horse (1, 9)->(2, 7)
+black-cannon (1, 2)->(1, 7)
+red-cannon x black-cannon (7, 7)->(1, 7)

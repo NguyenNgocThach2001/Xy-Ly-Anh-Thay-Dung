@@ -1,0 +1,2 @@
+red-soldier (4, 6)->(4, 5)
+black-soldier (4, 3)->(4, 4)

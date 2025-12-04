@@ -1,0 +1,3 @@
+red-cannon (7, 7)->(4, 7)
+black-soldier (4, 3)->(4, 4)
+red-soldier (2, 6)->(2, 5)

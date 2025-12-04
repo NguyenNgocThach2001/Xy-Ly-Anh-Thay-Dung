@@ -1,0 +1,13 @@
+__pycache__/
+
+runs/
+Dataset_Detection/
+Dataset_Segmentation/
+rawdata/
+processed_data/
+colab_runs/
+
+*.pyc
+*.pt
+*.rar
+*.ttf

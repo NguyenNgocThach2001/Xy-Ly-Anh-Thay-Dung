@@ -1,0 +1,1 @@
+# Move history (row,col dạng (cột,x ; hàng,y) theo (c,r) 0-based)

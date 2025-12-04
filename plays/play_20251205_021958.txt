@@ -1,0 +1,4 @@
+red-soldier (0, 6)->(0, 5)
+black-soldier (0, 3)->(0, 4)
+red-soldier x black-soldier (0, 5)->(0, 4)
+black-soldier (2, 3)->(2, 4)
